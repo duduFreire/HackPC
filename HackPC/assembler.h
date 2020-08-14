@@ -1,19 +1,32 @@
+#pragma once
 #include <string>
 #include <map>
 #include <vector>
+#include <fstream>
 
-std::string parse(std::string line);
-std::string assemble(std::string line, std::map <std::string, std::string>& labels);
-std::string aInstruction(std::string line, std::map <std::string, std::string>& labels);
-std::string cInstruction(std::string line);
+class Assembler
+{
+public:
+	Assembler(std::string asmPath);
+	void assemble();
 
-std::string comp(std::string line);
-std::string dest(std::string line);
-std::string jump(std::string line);
+private:
+	std::ifstream asmFile;
+	std::ofstream hackFile;
 
-std::string removeSpaces(std::string line);
-std::string allBefore(std::string& str, std::string delimiter);
-std::string allAfter(std::string& str, std::string delimiter);
-std::vector<std::string> splitIn2(std::string& str, std::string delimiter);
+	std::map<std::string, std::string> cInstructions;
+	std::map<std::string, int> variables;
+	std::map<std::string, std::string>jumps;
 
-void initializeVariablesMap();
+	int symbolsNum;
+private:
+	std::string parse(std::string line);
+	std::string assemble(std::string line, std::map <std::string, std::string>& labels);
+
+	std::string aInstruction(std::string line, std::map <std::string, std::string>& labels);
+	std::string cInstruction(std::string line);
+
+	std::string comp(std::string line);
+	std::string dest(std::string line);
+	std::string jump(std::string line);
+};

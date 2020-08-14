@@ -1,25 +1,23 @@
-#include "assembler.h"
+#include "Assembler.h"
 #include <vector>
-#include <boost/algorithm/string.hpp>
 #include <bitset>
-#include <iostream>
+#include "stringAlgs.h"
 
-std::map<std::string, std::string> cInstructions =
+using namespace stringalgs;
+
+Assembler::Assembler(std::string asmPath) :
+	asmFile(asmPath),
+	hackFile(allBefore(asmPath, ".") + ".hack")
 {
-{"0","101010"},{"1", "111111"},{"-1", "111010"},
-{"D", "001100"},{"A", "110000"},{"!D", "001101"},
-{"!A", "110001"},{"-D", "001111"},{"-A", "110011"},
-{"D-1", "001110"},{"A-1", "110010"},{"D-A", "010011"},
-{"A-D", "000111"},{"D+1", "011111"},{"A+1", "110111"},
-{"D+A", "000010"},{"D&A", "000000"},{"D|A", "010101"}
-};
+	cInstructions = {
+		{"0","101010"},{"1", "111111"},{"-1", "111010"},
+		{"D", "001100"},{"A", "110000"},{"!D", "001101"},
+		{"!A", "110001"},{"-D", "001111"},{"-A", "110011"},
+		{"D-1", "001110"},{"A-1", "110010"},{"D-A", "010011"},
+		{"A-D", "000111"},{"D+1", "011111"},{"A+1", "110111"},
+		{"D+A", "000010"},{"D&A", "000000"},{"D|A", "010101"}
+	};
 
-std::map<std::string, int> variables;
-std::map<std::string, std::string>jumps;
-int symbolsNum;
-
-void initializeVariablesMap()
-{
 	variables = {
 		{"@SCREEN", 16384}, {"@KBD", 24576},{"@SP", 0},
 		{"@LCL", 1}, {"@ARG", 2},{"@THIS", 3},
@@ -38,14 +36,45 @@ void initializeVariablesMap()
 	};
 }
 
-std::string parse(std::string line)
+void Assembler::assemble()
+{
+	std::map<std::string, std::string> labels;
+
+	int instructionCounter = 0;
+	std::string line;
+	while (std::getline(asmFile, line)) {
+		line = parse(line);
+		if (line.length() == 0) continue;
+
+		if (line[0] == '(') {
+			std::string label = line.substr(1, line.length() - 2);
+			labels[label] = "@" + std::to_string(instructionCounter);
+		}
+		else {
+			instructionCounter++;
+		}
+	}
+
+	asmFile.clear();
+	asmFile.seekg(0);
+	while (std::getline(asmFile, line)) {
+		line = assemble(line, labels);
+		if (line.length() == 0) continue;
+		hackFile << line << '\n';
+	}
+
+	hackFile.close();
+	asmFile.close();
+}
+
+std::string Assembler::parse(std::string line)
 {
 	line = removeSpaces(line);
 	if (line.length() == 1 || (line[0] == '/' && line[1] == '/')) return "";
 	return allBefore(line, "//");
 }
 
-std::string assemble(std::string line, std::map<std::string, std::string>& labels)
+std::string Assembler::assemble(std::string line, std::map<std::string, std::string>& labels)
 {
 	line = parse(line);
 	if (line.length() == 0 || line[0] == '(')  return "";
@@ -56,7 +85,7 @@ std::string assemble(std::string line, std::map<std::string, std::string>& label
 		return cInstruction(line);
 }
 
-std::string aInstruction(std::string line, std::map <std::string, std::string>& labels) {
+std::string Assembler::aInstruction(std::string line, std::map <std::string, std::string>& labels) {
 	std::string content = line.substr(1);
 	if (labels.count(content)) {
 		line = labels[content];
@@ -77,12 +106,12 @@ std::string aInstruction(std::string line, std::map <std::string, std::string>& 
 	return std::bitset<16>(num).to_string();
 }
 
-std::string cInstruction(std::string line)
+std::string Assembler::cInstruction(std::string line)
 {
 	return "111" + comp(line) + dest(line) + jump(line);
 }
 
-std::string comp(std::string line)
+std::string Assembler::comp(std::string line)
 {
 	line = allBefore(line, ";");
 	if (line.find("=") != std::string::npos) {
@@ -115,7 +144,7 @@ std::string comp(std::string line)
 	return aBit + cInstructions[line];
 }
 
-std::string dest(std::string line)
+std::string Assembler::dest(std::string line)
 {
 	std::string destination = allBefore(line, "=");
 	if (destination == line)
@@ -131,95 +160,10 @@ std::string dest(std::string line)
 	}
 }
 
-std::string jump(std::string line)
+std::string Assembler::jump(std::string line)
 {
 	line = allAfter(line, ";");
 	if (line.length() == 0) return "000";
 
 	return jumps[line];
-}
-
-std::string removeSpaces(std::string line)
-{
-	std::string result;
-	for (uint16_t i = 0; i < line.length(); i++) {
-		if (line[i] != ' ' && line[i] != '\n' && line[i] != '	') {
-			result.push_back(line[i]);
-		}
-	}
-
-	return result;
-}
-
-std::string allBefore(std::string& str, std::string delimiter)
-{
-	std::string result;
-	if (delimiter.length() == 1) {
-		for (uint16_t i = 0; str[i] != delimiter[0] && i < str.length(); i++) {
-			result.push_back(str[i]);
-		}
-	}
-	else {
-		for (uint16_t i = 0; str.substr(i, delimiter.length()) != delimiter && i < str.length(); i++) {
-			result.push_back(str[i]);
-		}
-	}
-
-	return result;
-}
-
-std::string allAfter(std::string & str, std::string delimiter)
-{
-	std::string result;
-	bool reachedDelimiter = false;
-	if (delimiter.length() == 1) {
-		for (int i = 0; i < str.length(); i++) {
-			if (reachedDelimiter) {
-				result.push_back(str[i]);
-			}
-
-			if (str[i] == delimiter[0]) reachedDelimiter = true;
-		}
-	}
-	else {
-		for (int i = 0; i < str.length(); i++) {
-			if (reachedDelimiter) {
-				result.push_back(str[i]);
-			}
-
-			if (str.substr(i, delimiter.length()) == delimiter) {
-				i += delimiter.length() - 1;
-				reachedDelimiter = true;
-			}
-		}
-	}
-
-	return result;
-}
-
-std::vector<std::string> splitIn2(std::string & str, std::string delimiter)
-{
-	std::vector<std::string> result = { "", "" };
-	if (delimiter.length() == 1) {
-		uint16_t i = 0;
-		for (; str[i] != delimiter[0] && i < str.length(); i++) {
-			result[0].push_back(str[i]);
-		}
-		i++;
-		for (; i < str.length(); i++) {
-			result[1].push_back(str[i]);
-		}
-	}
-	else {
-		int i = 0;
-		for (; str.substr(i, delimiter.length()) != delimiter && i < str.length(); i++) {
-			result[0].push_back(str[i]);
-		}
-		i++;
-		for (; i < str.length(); i++) {
-			result[1].push_back(str[i]);
-		}
-	}
-
-	return result;
 }

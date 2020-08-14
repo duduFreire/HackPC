@@ -127,11 +127,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="assembler.cpp" />
+    <ClCompile Include="Assembler.cpp" />
+    <ClCompile Include="stringAlgs.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="assembler.h" />
+    <ClInclude Include="Assembler.h" />
+    <ClInclude Include="stringAlgs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
